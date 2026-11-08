@@ -234,7 +234,7 @@ class App extends Component {
           <button onClick=${v.toggleRomaji} style=${`margin-left:auto;${ghostBtn};border-radius:12px;padding:0 16px;min-height:44px;font:inherit;font-size:15px;cursor:pointer`}>${v.romajiLabel}</button>
         </div>
         <div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
-          <div style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:8px">
+          <div class="chartgrid" style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:8px">
             ${v.chartRows.map(row => html`
               <div style="display:flex;gap:8px;align-items:center">
                 <div style="width:26px;flex-shrink:0;font-size:13px;color:#a08d93;text-align:center">${row.label}</div>
@@ -246,15 +246,17 @@ class App extends Component {
                   </button>` : html`<div style="flex:1 1 0;min-width:0;height:84px"></div>`)}
               </div>`)}
           </div>
-          <div style="flex:0 0 260px;position:sticky;top:24px;background:#fff;border:1px solid #eee1e3;border-radius:24px;padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;box-sizing:border-box">
+          <div class=${`selpanel${v.sel ? '' : ' empty'}`} style="flex:0 0 260px;position:sticky;top:24px;background:#fff;border:1px solid #eee1e3;border-radius:24px;padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;box-sizing:border-box">
             ${v.sel ? html`
-              <div style=${`${KANA_FONT};font-size:120px;line-height:1`}>${v.sel.ch}</div>
+              <div class="selch" style=${`${KANA_FONT};font-size:120px;line-height:1`}>${v.sel.ch}</div>
+              <div class="selinfo" style="display:contents">
               <div style="font-size:28px;font-weight:700;color:#b44d66">${v.sel.r}</div>
               <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
                 <div style="font-size:15px;color:#5e4a50">${v.sel.strokes}</div>
                 <div style="font-size:14px;color:#86727a">${v.sel.acc}</div>
               </div>
-              <div style="display:flex;flex-direction:column;gap:8px;width:100%">
+              </div>
+              <div class="selbtns" style="display:flex;flex-direction:column;gap:8px;width:100%">
                 <button onClick=${v.sel.speak} style="border:none;background:#fbe8ec;color:#b44d66;border-radius:14px;min-height:48px;font:inherit;font-size:16px;font-weight:700;cursor:pointer">Play sound</button>
                 <button onClick=${v.sel.quizRow} style=${`${ghostBtn};border-radius:14px;min-height:48px;font:inherit;font-size:16px;cursor:pointer`}>Quiz this row</button>
               </div>` : html`
@@ -318,10 +320,10 @@ class App extends Component {
         <div style="width:100%;max-width:760px;height:8px;border-radius:4px;background:#f2e6e8;overflow:hidden">
           <div style=${`height:100%;width:${v.pct};background:#d0647d;border-radius:4px;transition:width .3s`}></div>
         </div>
-        <div style=${`width:100%;max-width:760px;${card};border-radius:28px;padding:32px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:28px`}>
+        <div class="quizcard" style=${`width:100%;max-width:760px;${card};border-radius:28px;padding:32px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:28px`}>
           <div style="font-size:14px;color:#a08d93">${v.promptHint}</div>
           ${v.promptIsKana
-            ? html`<div style=${`${KANA_FONT};font-size:128px;line-height:1`}>${v.prompt}</div>`
+            ? html`<div class="prompt" style=${`${KANA_FONT};font-size:128px;line-height:1`}>${v.prompt}</div>`
             : html`<div style="font-size:72px;font-weight:700;line-height:1;color:#3b2b30">${v.prompt}</div>`}
 
           ${v.isMC && html`
@@ -333,14 +335,14 @@ class App extends Component {
             <input ref=${this.inpRef} value=${v.typed} onInput=${v.onType} onKeyDown=${v.onTypeKey} placeholder="type romaji" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" enterkeyhint="go" style=${`width:340px;max-width:100%;box-sizing:border-box;border:2px solid ${v.typeBorder};border-radius:18px;padding:16px 20px;font:inherit;font-size:30px;text-align:center;color:#3b2b30;background:#fff;outline:none`} />`}
 
           ${v.isWrite && html`
-            <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center">
+            <div class="write-wrap" style="display:flex;gap:16px;align-items:flex-start;justify-content:center">
               <div class="write-pad" style="position:relative;width:360px;height:360px;background:#fff;border:2px solid #eee1e3;border-radius:24px;overflow:hidden">
                 <div style="position:absolute;left:50%;top:16px;bottom:16px;border-left:2px dashed #f2e6e8"></div>
                 <div style="position:absolute;top:50%;left:16px;right:16px;border-top:2px dashed #f2e6e8"></div>
                 ${v.revealed && html`<div class="ghost" style=${`position:absolute;inset:0;display:grid;place-items:center;${KANA_FONT};font-size:250px;line-height:1;color:#f5ccd5`}>${v.ghost}</div>`}
                 <canvas ref=${this.canvasRef} onPointerDown=${this.down} onPointerMove=${this.move} onPointerUp=${this.up} onPointerCancel=${this.up} style="position:absolute;inset:0;width:360px;height:360px;touch-action:none"></canvas>
               </div>
-              <div style="display:flex;flex-direction:column;gap:10px">
+              <div class="write-tools" style="display:flex;flex-direction:column;gap:10px">
                 <button onClick=${v.undo} style=${`width:76px;min-height:48px;border-radius:14px;${ghostBtn};font:inherit;font-size:15px;cursor:pointer`}>Undo</button>
                 <button onClick=${v.clear} style=${`width:76px;min-height:48px;border-radius:14px;${ghostBtn};font:inherit;font-size:15px;cursor:pointer`}>Clear</button>
               </div>
@@ -376,7 +378,7 @@ class App extends Component {
                   </div>`)}
               </div>
             </div>`}
-          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;padding-top:8px">
+          <div class="donebtns" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;padding-top:8px">
             ${v.hasMissed && html`<button onClick=${v.retryMissed} style=${`${primary};border-radius:16px;padding:0 28px;min-height:52px;font:inherit;font-size:16px;font-weight:700;cursor:pointer`}>Retry missed</button>`}
             <button onClick=${v.again} style=${`${ghostBtn};border-radius:16px;padding:0 28px;min-height:52px;font:inherit;font-size:16px;font-weight:700;cursor:pointer`}>Same settings again</button>
             <button onClick=${v.toSetup} style=${`${ghostBtn};border-radius:16px;padding:0 28px;min-height:52px;font:inherit;font-size:16px;font-weight:700;cursor:pointer`}>Change settings</button>
@@ -398,15 +400,15 @@ class App extends Component {
         </div>
         <div style="display:flex;flex-direction:column;gap:10px">
           ${v.phrases.map(p => html`
-            <div key=${p.key} style=${`display:flex;align-items:center;gap:16px;${card};border-radius:20px;padding:18px 16px 18px 24px`}>
+            <div key=${p.key} class="phrase" style=${`display:flex;align-items:center;gap:16px;${card};border-radius:20px;padding:18px 16px 18px 24px`}>
               <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
                 ${p.heard && html`<div style="align-self:flex-start;font-size:12px;font-weight:700;color:#86727a;background:#f2e6e8;border-radius:6px;padding:2px 8px">You'll hear</div>`}
-                <div lang="ja" style=${`${KANA_FONT};font-size:24px;line-height:1.9;text-wrap:pretty`}>${p.segs.map(s => html`<ruby>${s.t}<rt style="font-size:12px;color:#b44d66;letter-spacing:0.02em">${s.rt}</rt></ruby>`)}</div>
+                <div lang="ja" class="jp" style=${`${KANA_FONT};font-size:24px;line-height:1.9;text-wrap:pretty`}>${p.segs.map(s => s.rt ? html`<ruby>${s.t}<rt style="font-size:12px;color:#b44d66;letter-spacing:0.02em">${s.rt}</rt></ruby>` : s.t)}</div>
                 ${v.phraseRomaji && html`<div style="font-size:15px;color:#b44d66">${p.ro}</div>`}
                 <div style="font-size:15px;color:#86727a">${p.en}</div>
               </div>
-              <button onClick=${p.speak} style="width:52px;height:52px;flex-shrink:0;border-radius:14px;border:none;background:#fbe8ec;color:#b44d66;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Play</button>
-              <button onClick=${p.star} aria-label="Save phrase" style=${`width:52px;height:52px;flex-shrink:0;border-radius:14px;border:1px solid #eee1e3;background:#fff;color:${p.starColor};font-size:24px;cursor:pointer`}>${p.starGlyph}</button>
+              <div class="phbtns" style="display:contents"><button onClick=${p.speak} style="width:52px;height:52px;flex-shrink:0;border-radius:14px;border:none;background:#fbe8ec;color:#b44d66;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Play</button>
+              <button onClick=${p.star} aria-label="Save phrase" style=${`width:52px;height:52px;flex-shrink:0;border-radius:14px;border:1px solid #eee1e3;background:#fff;color:${p.starColor};font-size:24px;cursor:pointer`}>${p.starGlyph}</button></div>
             </div>`)}
           ${v.noFavs && html`<div style="padding:48px 24px;text-align:center;color:#86727a;font-size:15px;border:2px dashed #eee1e3;border-radius:20px">No saved phrases yet. Tap ☆ on any phrase to save it here.</div>`}
         </div>

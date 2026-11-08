@@ -23,16 +23,43 @@ button{touch-action:manipulation}
 a{color:#b44d66}a:hover{color:#8f3a50}
 #app{height:100%}
 .sidebar{padding-top:max(32px,env(safe-area-inset-top))!important;padding-bottom:max(24px,env(safe-area-inset-bottom))!important}
+/* Narrow main area (phones, iPad portrait): show the selected character above the chart */
+@media (max-width:1099px){
+  .selpanel{order:-1;flex:1 1 100%!important;flex-direction:row!important;flex-wrap:wrap;justify-content:flex-start;align-items:center!important;padding:14px 18px!important;gap:14px 18px!important;top:0!important;z-index:2;box-shadow:0 4px 14px rgba(80,40,50,.08)}
+  .selpanel.empty{display:none!important}
+  .selpanel .selch{font-size:64px!important}
+  .selpanel .selinfo{display:flex!important;flex-direction:column;align-items:flex-start;gap:2px}
+  .selpanel .selinfo>div{align-items:flex-start!important}
+  .selpanel .selbtns{width:auto!important;margin-left:auto}
+  .selpanel .selbtns button{padding:0 16px}
+}
 /* Phones: sidebar becomes a bottom tab bar */
 @media (max-width:700px){
   .shell{flex-direction:column-reverse}
   .sidebar{width:100%!important;flex-direction:row!important;padding:6px 8px max(6px,env(safe-area-inset-bottom))!important;border-right:none!important;border-top:1px solid #eee1e3;gap:0!important}
   .sidebar .brand,.sidebar .foot{display:none!important}
   .sidebar .navlist{flex-direction:row!important;flex:1;justify-content:space-around}
-  .sidebar .navlist button{flex-direction:column;gap:4px!important;font-size:12px!important;padding:6px!important;min-height:0!important}
-  .page{padding:24px 16px 40px!important}
-  .write-pad,.write-pad canvas{width:280px!important;height:280px!important}
-  .write-pad .ghost{font-size:190px!important}
+  .sidebar .navlist button{flex:1;flex-direction:column;justify-content:center;gap:4px!important;font-size:12px!important;padding:6px!important;min-height:0!important}
+  .page{padding:max(20px,env(safe-area-inset-top)) 16px 32px!important;gap:20px!important}
+  .page h1{font-size:28px!important}
+  .chartgrid{gap:6px!important}
+  .chartgrid>div{gap:6px!important}
+  .chartgrid>div>div:first-child{width:14px!important}
+  .chartgrid button{height:72px!important;border-radius:14px!important}
+  .chartgrid button>span:first-child{font-size:30px!important}
+  .selpanel .selbtns{flex-direction:row!important;width:100%!important;margin-left:0}
+  .selpanel .selbtns button{flex:1}
+  .quizcard{padding:20px 16px!important;gap:20px!important;border-radius:24px!important}
+  .quizcard .prompt{font-size:104px!important}
+  .write-wrap{flex-direction:column;align-items:center!important}
+  .write-tools{flex-direction:row!important}
+  .write-pad,.write-pad canvas{width:min(300px,calc(100vw - 68px))!important;height:min(300px,calc(100vw - 68px))!important}
+  .write-pad .ghost{font-size:min(210px,calc((100vw - 68px) * .7))!important}
+  .phrase{align-items:flex-start!important;padding:16px!important;gap:12px!important}
+  .phrase .jp{font-size:22px!important}
+  .phrase .phbtns{display:flex!important;flex-direction:column;gap:8px;align-self:flex-start}
+  .phrase .phbtns button{width:44px!important;height:44px!important}
+  .donebtns{flex-direction:column;width:100%}
 }
 </style>
 </head>

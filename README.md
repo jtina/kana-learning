@@ -18,9 +18,9 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-## Put it on your iPad (offline)
+## Put it on your iPad or phone (offline)
 
-1. Host it on GitHub Pages: repo **Settings → Pages → Deploy from a branch → `main` / root**.
+1. Host it on GitHub Pages: repo **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `/ (root)` → Save**. It will be at https://jtina.github.io/kana-learning/.
 2. Open the Pages URL in Safari on the iPad, then **Share → Add to Home Screen**.
 3. Open it once while online. A service worker (`sw.js`) caches the app and fonts, so after that it works offline.
 
