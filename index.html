@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kana Pocket</title>
+<meta name="description" content="Hiragana & katakana chart, quizzes and travel phrases — works offline.">
+<meta name="theme-color" content="#f7eeef">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kana Pocket">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&amp;family=Klee+One:wght@400;600&amp;family=Shippori+Mincho:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#fbf7f6}
+body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans",system-ui,sans-serif;color:#3b2b30;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+button{touch-action:manipulation}
+a{color:#b44d66}a:hover{color:#8f3a50}
+#app{height:100%}
+.sidebar{padding-top:max(32px,env(safe-area-inset-top))!important;padding-bottom:max(24px,env(safe-area-inset-bottom))!important}
+/* Phones: sidebar becomes a bottom tab bar */
+@media (max-width:700px){
+  .shell{flex-direction:column-reverse}
+  .sidebar{width:100%!important;flex-direction:row!important;padding:6px 8px max(6px,env(safe-area-inset-bottom))!important;border-right:none!important;border-top:1px solid #eee1e3;gap:0!important}
+  .sidebar .brand,.sidebar .foot{display:none!important}
+  .sidebar .navlist{flex-direction:row!important;flex:1;justify-content:space-around}
+  .sidebar .navlist button{flex-direction:column;gap:4px!important;font-size:12px!important;padding:6px!important;min-height:0!important}
+  .page{padding:24px 16px 40px!important}
+  .write-pad,.write-pad canvas{width:280px!important;height:280px!important}
+  .write-pad .ghost{font-size:190px!important}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
