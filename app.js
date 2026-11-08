@@ -6,6 +6,7 @@ import * as PH from './phrases-data.js';
 const SETTINGS = { autoSpeak: true, showPhraseRomaji: true };
 
 const KANA_FONT = "font-family:var(--kana,'Zen Maru Gothic')";
+const furi = (segs, size) => segs.map(s => s.rt ? html`<ruby>${s.t}<rt style=${`font-size:${size}px;color:#b44d66;letter-spacing:0.02em`}>${s.rt}</rt></ruby>` : s.t);
 const load = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
 
 class App extends Component {
@@ -177,6 +178,8 @@ class App extends Component {
     v.catChips = cats.map((c, i) => ({ label: c.cat, go: () => set({ cat: i }), bg: S.cat === i ? '#d0647d' : '#f2e6e8', color: S.cat === i ? '#fff' : '#5e4a50' }));
     const list = S.cat === 0 ? P.PHRASES.flatMap(c => c.items).filter(p => S.stars[p[0]]) : P.PHRASES[S.cat - 1].items;
     v.phrases = list.map(p => { const on = !!S.stars[p[0]]; return { key: p[0], segs: P.furigana(p[0]), ro: p[1], en: p[2], heard: !!p[3],
+      replies: (p[4] || []).map(x => ({ segs: P.furigana(x[0]), ro: x[1], en: x[2], speak: () => this.speak(P.plain(x[0])) })),
+      replyLabel: p[3] ? 'You can reply' : 'They may answer',
       speak: () => this.speak(P.plain(p[0])), starGlyph: on ? '★' : '☆', starColor: on ? '#d0647d' : '#a08d93',
       star: () => { const stars = { ...this.state.stars }; on ? delete stars[p[0]] : stars[p[0]] = 1; this.save('kanapocket-stars', stars); set({ stars }); } }; });
     v.noFavs = S.cat === 0 && !v.phrases.length;
@@ -391,24 +394,38 @@ class App extends Component {
         <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
           <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:240px">
             <h1 style="margin:0;font-size:32px;font-weight:700">Travel Phrases</h1>
-            <div style="font-size:14px;color:#86727a">Furigana shows the reading above each kanji. Star the ones you want close at hand.</div>
+            <div style="font-size:14px;color:#86727a">Furigana shows the reading above each kanji. Lines marked “You'll hear” come with replies you can give. Star the ones you want close at hand.</div>
           </div>
           <button onClick=${v.togglePhraseRomaji} style=${`${ghostBtn};border-radius:12px;padding:0 16px;min-height:44px;font:inherit;font-size:15px;cursor:pointer`}>${v.phraseRomajiLabel}</button>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <div class="cats" style="display:flex;flex-wrap:wrap;gap:8px">
           ${v.catChips.map(c => html`<button onClick=${c.go} style=${`border:none;border-radius:999px;padding:0 18px;min-height:44px;font:inherit;font-size:15px;font-weight:700;background:${c.bg};color:${c.color};cursor:pointer`}>${c.label}</button>`)}
         </div>
         <div style="display:flex;flex-direction:column;gap:10px">
           ${v.phrases.map(p => html`
-            <div key=${p.key} class="phrase" style=${`display:flex;align-items:center;gap:16px;${card};border-radius:20px;padding:18px 16px 18px 24px`}>
-              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
-                ${p.heard && html`<div style="align-self:flex-start;font-size:12px;font-weight:700;color:#86727a;background:#f2e6e8;border-radius:6px;padding:2px 8px">You'll hear</div>`}
-                <div lang="ja" class="jp" style=${`${KANA_FONT};font-size:24px;line-height:1.9;text-wrap:pretty`}>${p.segs.map(s => s.rt ? html`<ruby>${s.t}<rt style="font-size:12px;color:#b44d66;letter-spacing:0.02em">${s.rt}</rt></ruby>` : s.t)}</div>
-                ${v.phraseRomaji && html`<div style="font-size:15px;color:#b44d66">${p.ro}</div>`}
-                <div style="font-size:15px;color:#86727a">${p.en}</div>
+            <div key=${p.key} class="phrase" style=${`display:flex;flex-direction:column;gap:14px;${card};border-radius:20px;padding:18px 16px 18px 24px`}>
+              <div class="phrow" style="display:flex;align-items:center;gap:16px">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                  ${p.heard && html`<div style="align-self:flex-start;font-size:12px;font-weight:700;color:#86727a;background:#f2e6e8;border-radius:6px;padding:2px 8px">You'll hear</div>`}
+                  <div lang="ja" class="jp" style=${`${KANA_FONT};font-size:24px;line-height:1.9;text-wrap:pretty`}>${furi(p.segs, 12)}</div>
+                  ${v.phraseRomaji && html`<div style="font-size:15px;color:#b44d66">${p.ro}</div>`}
+                  <div style="font-size:15px;color:#86727a">${p.en}</div>
+                </div>
+                <div class="phbtns" style="display:contents"><button onClick=${p.speak} style="width:52px;height:52px;flex-shrink:0;border-radius:14px;border:none;background:#fbe8ec;color:#b44d66;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Play</button>
+                <button onClick=${p.star} aria-label="Save phrase" style=${`width:52px;height:52px;flex-shrink:0;border-radius:14px;border:1px solid #eee1e3;background:#fff;color:${p.starColor};font-size:24px;cursor:pointer`}>${p.starGlyph}</button></div>
               </div>
-              <div class="phbtns" style="display:contents"><button onClick=${p.speak} style="width:52px;height:52px;flex-shrink:0;border-radius:14px;border:none;background:#fbe8ec;color:#b44d66;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Play</button>
-              <button onClick=${p.star} aria-label="Save phrase" style=${`width:52px;height:52px;flex-shrink:0;border-radius:14px;border:1px solid #eee1e3;background:#fff;color:${p.starColor};font-size:24px;cursor:pointer`}>${p.starGlyph}</button></div>
+              ${p.replies.length > 0 && html`
+                <div class="replies" style="display:flex;flex-direction:column;gap:2px;background:#fbf4f5;border-radius:14px;padding:10px 10px 10px 16px;border-left:3px solid #f0c7d1">
+                  <div style="font-size:12px;font-weight:700;color:#86727a;padding:2px 0 4px">${p.replyLabel}</div>
+                  ${p.replies.map((x, i) => html`
+                    <div style=${`display:flex;align-items:center;gap:12px;padding:6px 0;${i ? 'border-top:1px solid #f2e3e6' : ''}`}>
+                      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+                        <div lang="ja" style=${`${KANA_FONT};font-size:18px;line-height:1.8;text-wrap:pretty`}>${furi(x.segs, 10)}</div>
+                        <div style="font-size:13px;line-height:1.4;color:#86727a">${v.phraseRomaji && html`<span style="color:#b44d66">${x.ro}</span><span style="color:#d6c3c8"> · </span>`}${x.en}</div>
+                      </div>
+                      <button onClick=${x.speak} aria-label="Play reply" style="width:40px;height:40px;flex-shrink:0;border-radius:12px;border:1px solid #f0dde2;background:#fff;color:#b44d66;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Play</button>
+                    </div>`)}
+                </div>`}
             </div>`)}
           ${v.noFavs && html`<div style="padding:48px 24px;text-align:center;color:#86727a;font-size:15px;border:2px dashed #eee1e3;border-radius:20px">No saved phrases yet. Tap ☆ on any phrase to save it here.</div>`}
         </div>

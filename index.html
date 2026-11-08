@@ -55,10 +55,15 @@ a{color:#b44d66}a:hover{color:#8f3a50}
   .write-tools{flex-direction:row!important}
   .write-pad,.write-pad canvas{width:min(300px,calc(100vw - 68px))!important;height:min(300px,calc(100vw - 68px))!important}
   .write-pad .ghost{font-size:min(210px,calc((100vw - 68px) * .7))!important}
-  .phrase{align-items:flex-start!important;padding:16px!important;gap:12px!important}
+  .phrase{padding:16px!important;gap:12px!important}
+  .phrase .phrow{align-items:flex-start!important;gap:12px!important}
+  .replies{padding:8px 8px 8px 12px!important}
   .phrase .jp{font-size:22px!important}
   .phrase .phbtns{display:flex!important;flex-direction:column;gap:8px;align-self:flex-start}
   .phrase .phbtns button{width:44px!important;height:44px!important}
+  .cats{flex-wrap:nowrap!important;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .cats::-webkit-scrollbar{display:none}
+  .cats button{flex-shrink:0;white-space:nowrap}
   .donebtns{flex-direction:column;width:100%}
 }
 </style>
