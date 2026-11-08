@@ -1,7 +1,7 @@
 // Kana Pocket service worker — makes the app work offline.
-const VERSION = 'kanapocket-v4';
+const VERSION = 'kanapocket-v5';
 const SHELL = [
-  './', 'index.html', 'app.js', 'kana-data.js', 'phrases-data.js', 'vendor/htm-preact.js',
+  './', 'index.html', 'app.js', 'kana-data.js', 'phrases-data.js', 'vocab-data.js', 'vendor/htm-preact.js',
   'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

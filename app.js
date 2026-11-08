@@ -1,6 +1,7 @@
 import { html, render, Component } from './vendor/htm-preact.js';
 import { buildKana } from './kana-data.js';
 import * as PH from './phrases-data.js';
+import { VOCAB } from './vocab-data.js';
 
 // Settings (were design-tool props in the prototype)
 const SETTINGS = { autoSpeak: true, showPhraseRomaji: true };
@@ -12,12 +13,16 @@ const load = (k, d) => { try { const v = localStorage.getItem(k); return v == nu
 class App extends Component {
   state = { kana: buildKana(), ph: PH, tab: 'chart', cScript: 'h', cSet: 'basic', romaji: true, sel: null,
     mode: 'mc', qScript: 'h', qSets: { basic: true, dakuten: false, combo: false }, dir: 'k2r', qLen: 20,
-    q: null, stats: load('kanapocket-stats', {}), stars: load('kanapocket-stars', {}), phRomaji: load('kanapocket-phromaji', null) ?? undefined, cat: 1 };
+    q: null, rCats: {}, wcat: 1, stats: load('kanapocket-stats', {}), stars: load('kanapocket-stars', {}), phRomaji: load('kanapocket-phromaji', null) ?? undefined, cat: 1 };
 
   componentDidMount() {
     // Voices load asynchronously on iOS/Safari
     if (window.speechSynthesis) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices(); }
   }
+  // Scroll the content area back to the top whenever the screen changes
+  viewKey() { const S = this.state, q = S.q; return [S.tab, S.tab === 'quiz' ? (q ? (q.done ? 'done' : 'q' + q.i) : 'setup') : '', S.tab === 'phrases' ? S.cat : '', S.tab === 'words' ? S.wcat : ''].join('|'); }
+  componentDidUpdate() { const k = this.viewKey(); if (k !== this.lastView) { this.lastView = k; if (this.main) this.main.scrollTop = 0; } }
+  mainRef = el => { this.main = el; };
   save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   speak(t) {
     if (!window.speechSynthesis) return;
@@ -48,6 +53,33 @@ class App extends Component {
     }
     return out;
   }
+  // Staff asks → You respond
+  respondAll() {
+    return PH.PHRASES.flatMap(c => c.items.filter(p => p[3] && p[4]).map(p => ({ id: 'p:' + p[0], cat: c.cat, jp: p[0], segs: PH.furigana(p[0]), ro: p[1], en: p[2],
+      replies: p[4].map(x => ({ jp: x[0], segs: PH.furigana(x[0]), ro: x[1], en: x[2] })) })));
+  }
+  respondCats() { return [...new Set(this.respondAll().map(it => it.cat))]; }
+  respondPool() { const off = this.state.rCats; return this.respondAll().filter(it => !off[it.cat]); }
+  makeReplyOpts(item) {
+    const own = new Set(item.replies.map(x => PH.plain(x.jp)));
+    // Distractors: specific replies from other situations (skip generic ones like はい、お願いします that fit anywhere)
+    const specific = x => PH.plain(x.jp).replace(/^(はい|いいえ)、/, '').length > 7;
+    const pool = (strict) => { const seen = new Set(own), out = [];
+      for (const it of this.shuffle(this.respondAll())) { if (strict && it.cat === item.cat) continue;
+        for (const x of this.shuffle(it.replies)) { const t = PH.plain(x.jp); if (!seen.has(t) && specific(x)) { seen.add(t); out.push(x); break; } } }
+      return out; };
+    let wrong = pool(true); if (wrong.length < 3) wrong = [...wrong, ...pool(false).filter(x => !wrong.includes(x))];
+    const right = item.replies[Math.floor(Math.random() * item.replies.length)];
+    return this.shuffle([{ ...right, ok: true }, ...wrong.slice(0, 3).map(x => ({ ...x, ok: false }))]);
+  }
+  optsFor(item, dir, mode) { return mode === 'respond' ? this.makeReplyOpts(item) : this.makeOpts(item, dir); }
+  answerReply(i) {
+    const q = this.state.q; if (q.ans) return;
+    const it = q.items[q.i], o = q.opts[i], ok = o.ok;
+    this.record(it.id, ok);
+    if (SETTINGS.autoSpeak) this.speak(PH.plain(o.jp));
+    this.setState({ q: { ...q, ans: { ok, given: i }, ok: q.ok + (ok ? 1 : 0), missed: ok ? q.missed : [...q.missed, it] } });
+  }
   effDir(mode = this.state.mode) { return mode === 'type' ? 'k2r' : mode === 'write' ? 'r2k' : this.state.dir; }
   makeOpts(item, dir) {
     const all = this.state.kana.items.filter(it => it.script === item.script && it.r !== item.r);
@@ -59,10 +91,11 @@ class App extends Component {
     if (!items.length) return;
     const dir = this.effDir(mode);
     this.strokes = []; this.redraw();
-    this.setState({ tab: 'quiz', mode, q: { items, i: 0, dir, mode, ok: 0, missed: [], ans: null, typed: '', revealed: false, opts: this.makeOpts(items[0], dir) } },
+    this.setState({ tab: 'quiz', mode, q: { items, i: 0, dir, mode, ok: 0, missed: [], ans: null, typed: '', revealed: false, opts: this.optsFor(items[0], dir, mode) } },
       () => setTimeout(() => this.inp && this.inp.focus(), 60));
+    if (mode === 'respond' && SETTINGS.autoSpeak) this.speak(PH.plain(items[0].jp));
   }
-  startQuiz = () => { const p = this.pool(); if (!p.length) return; const n = this.state.qLen === 'all' ? p.length : Math.min(this.state.qLen, p.length); this.begin(this.pick(p, n)); };
+  startQuiz = () => { const p = this.state.mode === 'respond' ? this.respondPool() : this.pool(); if (!p.length) return; const n = this.state.qLen === 'all' ? p.length : Math.min(this.state.qLen, p.length); this.begin(this.pick(p, n)); };
   answer(given) {
     const q = this.state.q; if (q.ans) return;
     const it = q.items[q.i], g = given.trim().toLowerCase();
@@ -80,8 +113,9 @@ class App extends Component {
     const q = this.state.q, i = q.i + 1;
     this.strokes = []; this.redraw();
     if (i >= q.items.length) { this.setState({ q: { ...q, done: true } }); return; }
-    this.setState({ q: { ...q, i, ans: null, typed: '', revealed: false, opts: this.makeOpts(q.items[i], q.dir) } },
+    this.setState({ q: { ...q, i, ans: null, typed: '', revealed: false, opts: this.optsFor(q.items[i], q.dir, q.mode) } },
       () => this.inp && this.inp.focus());
+    if (q.mode === 'respond' && SETTINGS.autoSpeak) this.speak(PH.plain(q.items[i].jp));
   };
   // drawing pad
   canvasRef = el => { if (el && el !== this.cv) { this.cv = el; el.width = 720; el.height = 720; this.strokes = []; } if (!el) this.cv = null; };
@@ -107,9 +141,9 @@ class App extends Component {
 
   vals() {
     const S = this.state, set = o => this.setState(o), K = S.kana;
-    const tabs = [['chart', 'あ', 'Chart'], ['quiz', '問', 'Quiz'], ['phrases', '話', 'Phrases'], ['progress', '歩', 'Progress']];
+    const tabs = [['chart', 'あ', 'Chart'], ['quiz', '問', 'Quiz'], ['phrases', '話', 'Phrases'], ['words', '語', 'Words'], ['progress', '歩', 'Progress']];
     const nav = tabs.map(([t, glyph, label]) => { const on = S.tab === t; return { glyph, label, go: () => set({ tab: t }), bg: on ? '#fff' : 'transparent', color: on ? '#b44d66' : '#5e4a50', iconBg: on ? '#d0647d' : '#efe0e3', iconColor: on ? '#fff' : '#86727a' }; });
-    const v = { nav, isChart: S.tab === 'chart', isPhrases: S.tab === 'phrases', isProgress: S.tab === 'progress', showRomaji: S.romaji,
+    const v = { nav, isChart: S.tab === 'chart', isPhrases: S.tab === 'phrases', isProgress: S.tab === 'progress', isWords: S.tab === 'words', showRomaji: S.romaji,
       romajiLabel: S.romaji ? 'Hide romaji' : 'Show romaji', toggleRomaji: () => set({ romaji: !S.romaji }) };
     v.scriptSeg = this.seg([['h', 'ひらがな'], ['k', 'カタカナ']], S.cScript, x => set({ cScript: x, sel: null }));
     v.setSeg = this.seg([['basic', 'Basic'], ['dakuten', 'Dakuten'], ['combo', 'Combos']], S.cSet, x => set({ cSet: x, sel: null }));
@@ -130,7 +164,7 @@ class App extends Component {
     // quiz setup
     const q = S.q;
     v.isQuizSetup = S.tab === 'quiz' && !q; v.isQuizActive = S.tab === 'quiz' && !!q && !q.done; v.isQuizDone = S.tab === 'quiz' && !!q && !!q.done;
-    const modes = [['mc', 'ア', 'Multiple choice', 'Pick the right answer from four options.'], ['type', 'ka', 'Type the reading', 'See a kana, type its romaji on the keyboard.'], ['write', '✎', 'Write it', 'See the romaji, draw the kana with your finger or Pencil, then check yourself.']];
+    const modes = [['mc', 'ア', 'Multiple choice', 'Pick the right answer from four options.'], ['type', 'ka', 'Type the reading', 'See a kana, type its romaji on the keyboard.'], ['write', '✎', 'Write it', 'See the romaji, draw the kana with your finger or Pencil, then check yourself.'], ['respond', '応', 'Staff asks → You respond', 'Hear what staff say at the shop, restaurant or hotel, then pick a natural reply.']];
     v.modeCards = modes.map(([m, glyph, title, desc]) => { const on = S.mode === m; return { glyph, title, desc, go: () => set({ mode: m }), border: on ? '#d0647d' : '#eee1e3', bg: on ? '#fdf1f3' : '#fff', iconBg: on ? '#d0647d' : '#f2e6e8', iconColor: on ? '#fff' : '#86727a', dot: on ? '#d0647d' : 'transparent' }; });
     v.qScriptSeg = this.seg([['h', 'Hiragana'], ['k', 'Katakana'], ['both', 'Both']], S.qScript, x => set({ qScript: x }));
     v.setChips = [['basic', 'Basic'], ['dakuten', 'Dakuten'], ['combo', 'Combos']].map(([k, label]) => { const on = S.qSets[k]; return { label, go: () => set({ qSets: { ...S.qSets, [k]: !on } }), border: on ? '#d0647d' : '#eee1e3', bg: on ? '#fdf1f3' : '#fff', color: on ? '#b44d66' : '#86727a' }; });
@@ -138,8 +172,11 @@ class App extends Component {
     v.dirNote = S.mode === 'type' ? 'Kana → romaji' : 'Romaji → kana';
     v.dirSeg = this.seg([['k2r', 'Kana → romaji'], ['r2k', 'Romaji → kana']], S.dir, x => set({ dir: x }));
     v.lenSeg = this.seg([[10, '10'], [20, '20'], ['all', 'All']], S.qLen, x => set({ qLen: x }));
+    v.isRespondSetup = S.mode === 'respond';
+    v.rCatChips = this.respondCats().map(c => { const on = !S.rCats[c]; return { label: c, go: () => set({ rCats: { ...S.rCats, [c]: on } }), border: on ? '#d0647d' : '#eee1e3', bg: on ? '#fdf1f3' : '#fff', color: on ? '#b44d66' : '#86727a' }; });
     const pool = this.pool(), nWeak = pool.filter(it => this.isWeak(it.id)).length;
     v.poolNote = !pool.length ? 'Choose at least one character set.' : `${pool.length} characters${nWeak ? ` · ${nWeak} weak ones come up more often` : ''}`;
+    if (S.mode === 'respond') { const rp = this.respondPool().length; v.poolNote = rp ? `${rp} things staff say` : 'Choose at least one situation.'; }
     // active quiz
     if (q && !q.done) {
       const it = q.items[q.i], a = q.ans, k2r = q.dir === 'k2r', n = q.items.length;
@@ -162,10 +199,22 @@ class App extends Component {
         reveal: () => { set({ q: { ...q, revealed: true } }); if (SETTINGS.autoSpeak) this.speak(it.ch); },
         markGot: () => this.selfMark(true), markMiss: () => this.selfMark(false) });
     }
+    if (q && !q.done && q.mode === 'respond') {
+      const it = q.items[q.i], a = q.ans;
+      Object.assign(v, { isMC: false, promptIsKana: false, isRespond: true, promptHint: `${it.cat} · staff says`,
+        rPrompt: it, rSpeak: () => this.speak(PH.plain(it.jp)), showEn: !!(a || q.showEn), toggleEn: () => set({ q: { ...q, showEn: true } }),
+        rOpts: q.opts.map((o, i) => { const chosen = a && a.given === i;
+          return { ...o, go: () => this.answerReply(i), showEn: !!a,
+            bg: a && o.ok ? '#e3f2e7' : chosen ? '#fbe5e1' : '#fff', border: a && o.ok ? '#7fbf94' : chosen ? '#e3917f' : '#eee1e3',
+            opacity: a && !o.ok && !chosen ? 0.5 : 1 }; }),
+        fbText: !a ? '' : a.ok ? 'Correct!' : 'Not quite — the green one fits.',
+        otherReplies: a ? it.replies.filter(x => !q.opts.some(o => o.ok && o.jp === x.jp)) : [] });
+    }
     if (q && q.done) {
       const n = q.items.length, seen = new Set();
       Object.assign(v, { score: `${q.ok} / ${n}`, scorePct: `${Math.round(q.ok / n * 100)}% correct`, hasMissed: q.missed.length > 0,
-        missed: q.missed.filter(m => !seen.has(m.id) && seen.add(m.id)).map(m => ({ ch: m.ch, r: m.r })),
+        missed: q.mode === 'respond' ? [] : q.missed.filter(m => !seen.has(m.id) && seen.add(m.id)).map(m => ({ ch: m.ch, r: m.r })),
+        missedPhrases: q.mode !== 'respond' ? [] : q.missed.filter(m => !seen.has(m.id) && seen.add(m.id)),
         retryMissed: () => this.begin(this.shuffle(q.missed), q.mode),
         again: () => this.begin(this.shuffle(q.items), q.mode), toSetup: () => set({ q: null }) });
     }
@@ -183,9 +232,18 @@ class App extends Component {
       speak: () => this.speak(P.plain(p[0])), starGlyph: on ? '★' : '☆', starColor: on ? '#d0647d' : '#a08d93',
       star: () => { const stars = { ...this.state.stars }; on ? delete stars[p[0]] : stars[p[0]] = 1; this.save('kanapocket-stars', stars); set({ stars }); } }; });
     v.noFavs = S.cat === 0 && !v.phrases.length;
+    // words
+    const wcats = [{ cat: '★ Saved' }, ...VOCAB];
+    v.wordChips = wcats.map((c, i) => ({ label: c.cat, go: () => set({ wcat: i }), bg: S.wcat === i ? '#d0647d' : '#f2e6e8', color: S.wcat === i ? '#fff' : '#5e4a50' }));
+    const wlist = S.wcat === 0 ? VOCAB.flatMap(c => c.items).filter(w => S.stars['w:' + w[0]]) : VOCAB[S.wcat - 1].items;
+    v.words = wlist.map(w => { const key = 'w:' + w[0], on = !!S.stars[key]; return { key, segs: P.furigana(w[0]), ro: w[1], en: w[2],
+      speak: () => this.speak(P.plain(w[0])), starGlyph: on ? '★' : '☆', starColor: on ? '#d0647d' : '#a08d93',
+      star: () => { const stars = { ...this.state.stars }; on ? delete stars[key] : stars[key] = 1; this.save('kanapocket-stars', stars); set({ stars }); } }; });
+    v.noWordFavs = S.wcat === 0 && !v.words.length;
+    v.wordCount = VOCAB.reduce((n, c) => n + c.items.length, 0);
     // progress
     const tried = K.items.filter(it => this.tries(it.id)), mastered = tried.filter(it => this.tries(it.id) >= 3 && this.acc(it.id) >= 0.85);
-    const tot = Object.values(S.stats).reduce((a, s) => [a[0] + s.c, a[1] + s.c + s.w], [0, 0]);
+    const tot = Object.entries(S.stats).filter(([k]) => !k.startsWith('p:')).map(([, s]) => s).reduce((a, s) => [a[0] + s.c, a[1] + s.c + s.w], [0, 0]);
     v.tiles = [{ label: 'Characters practiced', value: `${tried.length} / ${K.items.length}` }, { label: 'Mastered', value: mastered.length }, { label: 'Overall accuracy', value: tot[1] ? `${Math.round(tot[0] / tot[1] * 100)}%` : '—' }];
     const heatBg = c => { const a = this.acc(c.id); return a === null ? '#f4ecec' : a < 0.5 ? 'oklch(0.92 0.045 5)' : a < 0.8 ? 'oklch(0.8 0.09 5)' : 'oklch(0.65 0.13 5)'; };
     v.heat = [['h', 'Hiragana'], ['k', 'Katakana']].map(([s, title]) => { const hs = K.sections[s][0], rows = [];
@@ -223,7 +281,7 @@ class App extends Component {
     <div class="foot" style="margin-top:auto;padding:0 12px;font-size:12px;color:#a08d93;line-height:1.5">Progress and saved phrases stay on this device.</div>
   </div>
 
-  <div style="flex:1;min-width:0;overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div ref=${this.mainRef} style="flex:1;min-width:0;overflow-y:auto;-webkit-overflow-scrolling:touch">
 
     ${v.isChart && html`
       <div class="page" style="padding:36px 40px 56px;display:flex;flex-direction:column;gap:24px;max-width:1120px;box-sizing:border-box">
@@ -285,6 +343,13 @@ class App extends Component {
             </button>`)}
         </div>
         <div style=${`${card};border-radius:24px;padding:8px 24px;display:flex;flex-direction:column`}>
+          ${v.isRespondSetup ? html`
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid #f3e9eb;flex-wrap:wrap">
+            <div style="font-size:16px;font-weight:500">Situations</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${v.rCatChips.map(o => html`<button onClick=${o.go} style=${`border:2px solid ${o.border};border-radius:12px;padding:0 16px;min-height:44px;font:inherit;font-size:15px;font-weight:700;background:${o.bg};color:${o.color};cursor:pointer`}>${o.label}</button>`)}
+            </div>
+          </div>` : html`
           <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid #f3e9eb;flex-wrap:wrap">
             <div style="font-size:16px;font-weight:500">Characters</div>
             ${segGroup(v.qScriptSeg, 16)}
@@ -302,6 +367,7 @@ class App extends Component {
             </div>
             ${!v.dirLocked && segGroup(v.dirSeg, 16)}
           </div>
+          `}
           <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap">
             <div style="font-size:16px;font-weight:500">Questions</div>
             ${segGroup(v.lenSeg, 18)}
@@ -325,7 +391,24 @@ class App extends Component {
         </div>
         <div class="quizcard" style=${`width:100%;max-width:760px;${card};border-radius:28px;padding:32px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:28px`}>
           <div style="font-size:14px;color:#a08d93">${v.promptHint}</div>
-          ${v.promptIsKana
+          ${v.isRespond ? html`
+            <div style="width:100%;display:flex;align-items:flex-start;gap:14px">
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center">
+                <div lang="ja" class="rprompt" style=${`${KANA_FONT};font-size:32px;line-height:1.9;text-wrap:pretty`}>${furi(v.rPrompt.segs, 14)}</div>
+                ${v.phraseRomaji && html`<div style="font-size:15px;color:#b44d66">${v.rPrompt.ro}</div>`}
+                ${v.showEn ? html`<div style="font-size:15px;color:#86727a">${v.rPrompt.en}</div>`
+                  : html`<button onClick=${v.toggleEn} style="margin-top:4px;border:none;background:none;color:#a08d93;font:inherit;font-size:14px;text-decoration:underline;cursor:pointer;padding:4px">Show English</button>`}
+              </div>
+              <button onClick=${v.rSpeak} aria-label="Play" style="width:52px;height:52px;flex-shrink:0;border-radius:14px;border:none;background:#fbe8ec;color:#b44d66;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Play</button>
+            </div>
+            <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+              ${v.rOpts.map(o => html`<button class="ropt" onClick=${o.go} style=${`min-height:64px;border-radius:18px;border:2px solid ${o.border};background:${o.bg};color:#3b2b30;opacity:${o.opacity};text-align:left;padding:10px 18px;font:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;transition:background .15s,border-color .15s`}>
+                <span lang="ja" style=${`${KANA_FONT};font-size:21px;line-height:1.8`}>${furi(o.segs, 10)}</span>
+                ${(v.phraseRomaji || o.showEn) && html`<span style="font-size:13px;line-height:1.4;color:#86727a">${v.phraseRomaji && html`<span style="color:#b44d66">${o.ro}</span>`}${v.phraseRomaji && o.showEn && html`<span style="color:#d6c3c8"> · </span>`}${o.showEn && o.en}</span>`}
+              </button>`)}
+            </div>
+            ${v.otherReplies.length > 0 && html`<div style="width:100%;font-size:13px;color:#86727a;display:flex;flex-direction:column;gap:2px"><span style="font-weight:700">Also fine:</span>${v.otherReplies.map(x => html`<span><span lang="ja" style=${`${KANA_FONT};font-size:16px;color:#3b2b30`}>${PH.plain(x.jp)}</span> · ${x.en}</span>`)}</div>`}`
+          : v.promptIsKana
             ? html`<div class="prompt" style=${`${KANA_FONT};font-size:128px;line-height:1`}>${v.prompt}</div>`
             : html`<div style="font-size:72px;font-weight:700;line-height:1;color:#3b2b30">${v.prompt}</div>`}
 
@@ -373,6 +456,12 @@ class App extends Component {
           ${v.hasMissed && html`
             <div style="width:100%;display:flex;flex-direction:column;gap:10px;align-items:center;padding-top:8px;border-top:1px solid #f3e9eb">
               <div style="font-size:14px;font-weight:700;color:#86727a;padding-top:12px">To review</div>
+              ${v.missedPhrases.length > 0 && html`<div style="width:100%;display:flex;flex-direction:column;gap:8px">
+                ${v.missedPhrases.map(m => html`<div style="border-radius:14px;background:#fbe8ec;padding:10px 14px;display:flex;flex-direction:column;gap:2px">
+                  <span lang="ja" style=${`${KANA_FONT};font-size:18px;line-height:1.8`}>${furi(m.segs, 10)}</span>
+                  <span style="font-size:13px;color:#86727a">${m.en} → <span lang="ja" style=${`${KANA_FONT};color:#2f7a4a`}>${m.replies.map(x => PH.plain(x.jp)).join(' / ')}</span></span>
+                </div>`)}
+              </div>`}
               <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
                 ${v.missed.map(m => html`
                   <div style="display:flex;flex-direction:column;align-items:center;min-width:56px;padding:8px 10px;border-radius:14px;background:#fbe8ec">
@@ -429,6 +518,30 @@ class App extends Component {
             </div>`)}
           ${v.noFavs && html`<div style="padding:48px 24px;text-align:center;color:#86727a;font-size:15px;border:2px dashed #eee1e3;border-radius:20px">No saved phrases yet. Tap ☆ on any phrase to save it here.</div>`}
         </div>
+      </div>`}
+
+    ${v.isWords && html`
+      <div class="page" style="padding:36px 40px 56px;display:flex;flex-direction:column;gap:24px;max-width:1000px;box-sizing:border-box">
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:240px">
+            <h1 style="margin:0;font-size:32px;font-weight:700">Useful Words</h1>
+            <div style="font-size:14px;color:#86727a">${v.wordCount} everyday words for getting around. Tap a card to hear it.</div>
+          </div>
+          <button onClick=${v.togglePhraseRomaji} style=${`${ghostBtn};border-radius:12px;padding:0 16px;min-height:44px;font:inherit;font-size:15px;cursor:pointer`}>${v.phraseRomajiLabel}</button>
+        </div>
+        <div class="cats" style="display:flex;flex-wrap:wrap;gap:8px">
+          ${v.wordChips.map(c => html`<button onClick=${c.go} style=${`border:none;border-radius:999px;padding:0 18px;min-height:44px;font:inherit;font-size:15px;font-weight:700;background:${c.bg};color:${c.color};cursor:pointer`}>${c.label}</button>`)}
+        </div>
+        <div class="wordgrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
+          ${v.words.map(w => html`
+            <div key=${w.key} onClick=${w.speak} role="button" style=${`position:relative;${card};border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-height:110px;box-sizing:border-box`}>
+              <div lang="ja" class="wjp" style=${`${KANA_FONT};font-size:28px;line-height:1.8;padding-right:40px`}>${furi(w.segs, 12)}</div>
+              ${v.phraseRomaji && html`<div style="font-size:14px;color:#b44d66">${w.ro}</div>`}
+              <div style="font-size:14px;color:#86727a">${w.en}</div>
+              <button onClick=${e => { e.stopPropagation(); w.star(); }} aria-label="Save word" style=${`position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:12px;border:1px solid #eee1e3;background:#fff;color:${w.starColor};font-size:20px;cursor:pointer`}>${w.starGlyph}</button>
+            </div>`)}
+        </div>
+        ${v.noWordFavs && html`<div style="padding:48px 24px;text-align:center;color:#86727a;font-size:15px;border:2px dashed #eee1e3;border-radius:20px">No saved words yet. Tap ☆ on any word to save it here.</div>`}
       </div>`}
 
     ${v.isProgress && html`
