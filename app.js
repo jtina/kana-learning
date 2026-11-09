@@ -594,4 +594,7 @@ class App extends Component {
   }
 }
 
-render(html`<${App} />`, document.getElementById('app'));
+const root = document.getElementById('app');
+root.textContent = '';
+render(html`<${App} />`, root);
+window.__kanaStarted = true;

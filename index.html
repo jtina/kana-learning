@@ -15,7 +15,8 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&amp;family=Klee+One:wght@400;600&amp;family=Shippori+Mincho:wght@500&amp;display=swap" rel="stylesheet">
+<!-- Loaded without blocking the page, so a slow or captive network can never leave the screen blank -->
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&amp;family=Klee+One:wght@400;600&amp;family=Shippori+Mincho:wght@500&amp;display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 html,body{margin:0;height:100%;background:#fbf7f6}
 body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans",system-ui,sans-serif;color:#3b2b30;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
@@ -72,7 +73,27 @@ a{color:#b44d66}a:hover{color:#8f3a50}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app"><div id="boot" style="height:100%;display:grid;place-items:center;color:#a08d93;font-size:15px">Loading…</div></div>
+<div id="bootfail" style="position:fixed;inset:0;display:none;place-items:center;padding:24px;background:#fbf7f6;text-align:center;color:#5e4a50">
+  <div style="max-width:360px;display:flex;flex-direction:column;gap:14px;align-items:center">
+    <div style="font-size:22px;font-weight:700;color:#c25a73">Kana Pocket didn't start</div>
+    <div style="font-size:15px;line-height:1.5">This can happen on Wi-Fi that needs you to sign in first. Try turning Wi-Fi off (or sign in to it), then tap Try again.</div>
+    <button onclick="location.reload()" style="border:none;background:#d0647d;color:#fff;border-radius:14px;padding:0 28px;min-height:48px;font:inherit;font-size:16px;font-weight:700">Try again</button>
+    <button id="repair" style="border:1px solid #eee1e3;background:#fff;color:#5e4a50;border-radius:14px;padding:0 20px;min-height:44px;font:inherit;font-size:14px">Repair app (re-download when online)</button>
+    <div style="font-size:12px;color:#a08d93">Repair keeps your progress and saved phrases.</div>
+  </div>
+</div>
+<script>
+// If the app hasn't started after 6 seconds, offer a way out instead of a blank screen
+setTimeout(() => { if (!window.__kanaStarted) document.getElementById("bootfail").style.display = "grid"; }, 6000);
+document.getElementById('repair').onclick = async () => {
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r => r.unregister()));
+    const keys = await caches.keys(); await Promise.all(keys.filter(k => !k.includes('fonts')).map(k => caches.delete(k)));
+  } catch (e) {}
+  location.reload();
+};
+</script>
 <script type="module" src="app.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
