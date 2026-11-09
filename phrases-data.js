@@ -21,7 +21,9 @@ export const PHRASES = [
     ['お支払{しはら}い方法{ほうほう}は？','Oshiharai hōhō wa?','How would you like to pay?',1, r(
       'クレジットカードでお願{ねが}いします。|Kurejitto kādo de onegai shimasu.|By credit card, please.',
       'スイカでお願{ねが}いします。|Suika de onegai shimasu.|By Suica, please.',
-      '現金{げんきん}でお願{ねが}いします。|Genkin de onegai shimasu.|Cash, please.')],
+      '現金{げんきん}でお願{ねが}いします。|Genkin de onegai shimasu.|Cash, please.',
+      'アップルペイでお願{ねが}いします。|Appuru Pei de onegai shimasu.|Apple Pay, please.',
+      'クレジットカードのタッチ決済{けっさい}でお願{ねが}いします。|Kurejitto kādo no tatchi kessai de onegai shimasu.|Contactless credit card, please.')],
     ['レシートはご利用{りよう}ですか？','Reshīto wa go-riyō desu ka?','Would you like a receipt?',1, r(
       'はい、ください。|Hai, kudasai.|Yes, please.', NO_THANKS)],
     ['年齢確認{ねんれいかくにん}をお願{ねが}いします。','Nenrei kakunin o onegai shimasu.','Please confirm your age.',1, r(
@@ -31,6 +33,10 @@ export const PHRASES = [
     ['温{あたた}めてください。','Atatamete kudasai.','Please heat it up.'],
     ['お箸{はし}をください。','Ohashi o kudasai.','Chopsticks, please.'],
     ['カードで払{はら}えますか？','Kādo de haraemasu ka?','Can I pay by card?'],
+    ['アップルペイは使{つか}えますか？','Appuru Pei wa tsukaemasu ka?','Can I use Apple Pay?'],
+    ['アップルペイでお願{ねが}いします。','Appuru Pei de onegai shimasu.','Apple Pay, please.'],
+    ['クレジットカードのタッチ決済{けっさい}でお願{ねが}いします。','Kurejitto kādo no tatchi kessai de onegai shimasu.','Contactless credit card, please. (tap to pay)'],
+    ['スイカでお願{ねが}いします。','Suika de onegai shimasu.','By Suica, please.'],
     ['レシートはいりません。','Reshīto wa irimasen.',"I don't need the receipt."],
   ]},
   { cat: 'Restaurant', items: [
