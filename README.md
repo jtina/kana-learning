@@ -5,6 +5,7 @@ An offline-friendly web app for learning hiragana and katakana on an iPad.
 - **Chart**: hiragana and katakana (basic, dakuten, combos). Tap a character to hear it and see its stroke count and your accuracy, or quiz yourself on that row.
 - **Quiz**: multiple choice (either direction), type the romaji, or write the kana with your finger or Apple Pencil and mark yourself. Characters you miss come up more often.
   **Staff asks → You respond** plays something a shop, restaurant or hotel worker would say and has you pick a natural reply.
+  **Useful words** quizzes the Words tab: Japanese → English, English → Japanese, or type the romaji (long vowels can be typed as o, ou or oo).
 - **Phrases**: travel phrases in 8 categories with furigana, romaji (can be hidden), English, audio and favourites.
 - **Words**: ~100 everyday words (food, places, transit, money, time, question words, adjectives, signs) with furigana, audio and favourites.
 - **Progress**: accuracy heatmap and a quiz of your weakest characters.

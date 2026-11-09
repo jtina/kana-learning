@@ -13,7 +13,7 @@ const load = (k, d) => { try { const v = localStorage.getItem(k); return v == nu
 class App extends Component {
   state = { kana: buildKana(), ph: PH, tab: 'chart', cScript: 'h', cSet: 'basic', romaji: true, sel: null,
     mode: 'mc', qScript: 'h', qSets: { basic: true, dakuten: false, combo: false }, dir: 'k2r', qLen: 20,
-    q: null, rCats: {}, wcat: 1, stats: load('kanapocket-stats', {}), stars: load('kanapocket-stars', {}), phRomaji: load('kanapocket-phromaji', null) ?? undefined, cat: 1 };
+    q: null, rCats: {}, wCats: {}, vdir: 'j2e', wcat: 1, stats: load('kanapocket-stats', {}), stars: load('kanapocket-stars', {}), phRomaji: load('kanapocket-phromaji', null) ?? undefined, cat: 1 };
 
   componentDidMount() {
     // Voices load asynchronously on iOS/Safari
@@ -72,12 +72,28 @@ class App extends Component {
     const right = item.replies[Math.floor(Math.random() * item.replies.length)];
     return this.shuffle([{ ...right, ok: true }, ...wrong.slice(0, 3).map(x => ({ ...x, ok: false }))]);
   }
-  optsFor(item, dir, mode) { return mode === 'respond' ? this.makeReplyOpts(item) : this.makeOpts(item, dir); }
+  // Words quiz
+  wordAll() { return VOCAB.flatMap(c => c.items.map(w => ({ id: 'w:' + w[0], cat: c.cat, jp: w[0], segs: PH.furigana(w[0]), ro: w[1], en: w[2] }))); }
+  wordPool() { const off = this.state.wCats; return this.wordAll().filter(it => !off[it.cat]); }
+  makeWordOpts(item, vdir) {
+    if (vdir === 'type') return [];
+    const all = this.wordAll().filter(w => w.id !== item.id && w.en !== item.en && PH.plain(w.jp) !== PH.plain(item.jp));
+    // Prefer other words from the same group so the choices are plausible
+    const same = this.shuffle(all.filter(w => w.cat === item.cat)), other = this.shuffle(all.filter(w => w.cat !== item.cat));
+    const wrong = [...same, ...other].slice(0, 3);
+    return this.shuffle([{ ...item, ok: true }, ...wrong.map(w => ({ ...w, ok: false }))]);
+  }
+  // Romaji check that ignores spaces, apostrophes and how long vowels are written (ō = o = ou = oo)
+  normRomaji(t) {
+    return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '')
+      .replace(/ou/g, 'o').replace(/([aiueo])\1+/g, '$1');
+  }
+  optsFor(item, dir, mode) { return mode === 'respond' ? this.makeReplyOpts(item) : mode === 'vocab' ? this.makeWordOpts(item, this.state.vdir) : this.makeOpts(item, dir); }
   answerReply(i) {
     const q = this.state.q; if (q.ans) return;
     const it = q.items[q.i], o = q.opts[i], ok = o.ok;
     this.record(it.id, ok);
-    if (SETTINGS.autoSpeak) this.speak(PH.plain(o.jp));
+    if (SETTINGS.autoSpeak) this.speak(PH.plain(q.mode === 'vocab' ? it.jp : o.jp));
     this.setState({ q: { ...q, ans: { ok, given: i }, ok: q.ok + (ok ? 1 : 0), missed: ok ? q.missed : [...q.missed, it] } });
   }
   effDir(mode = this.state.mode) { return mode === 'type' ? 'k2r' : mode === 'write' ? 'r2k' : this.state.dir; }
@@ -91,13 +107,20 @@ class App extends Component {
     if (!items.length) return;
     const dir = this.effDir(mode);
     this.strokes = []; this.redraw();
-    this.setState({ tab: 'quiz', mode, q: { items, i: 0, dir, mode, ok: 0, missed: [], ans: null, typed: '', revealed: false, opts: this.optsFor(items[0], dir, mode) } },
+    this.setState({ tab: 'quiz', mode, q: { items, i: 0, dir, mode, vdir: this.state.vdir, ok: 0, missed: [], ans: null, typed: '', revealed: false, opts: this.optsFor(items[0], dir, mode) } },
       () => setTimeout(() => this.inp && this.inp.focus(), 60));
-    if (mode === 'respond' && SETTINGS.autoSpeak) this.speak(PH.plain(items[0].jp));
+    if ((mode === 'respond' || (mode === 'vocab' && this.state.vdir === 'j2e')) && SETTINGS.autoSpeak) this.speak(PH.plain(items[0].jp));
   }
-  startQuiz = () => { const p = this.state.mode === 'respond' ? this.respondPool() : this.pool(); if (!p.length) return; const n = this.state.qLen === 'all' ? p.length : Math.min(this.state.qLen, p.length); this.begin(this.pick(p, n)); };
+  startQuiz = () => { const m = this.state.mode, p = m === 'respond' ? this.respondPool() : m === 'vocab' ? this.wordPool() : this.pool(); if (!p.length) return; const n = this.state.qLen === 'all' ? p.length : Math.min(this.state.qLen, p.length); this.begin(this.pick(p, n)); };
   answer(given) {
     const q = this.state.q; if (q.ans) return;
+    if (q.mode === 'vocab') { // typed romaji for a word
+      const it = q.items[q.i], ok = this.normRomaji(given) === this.normRomaji(it.ro);
+      this.record(it.id, ok);
+      if (SETTINGS.autoSpeak) this.speak(PH.plain(it.jp));
+      this.setState({ q: { ...q, ans: { ok, given }, ok: q.ok + (ok ? 1 : 0), missed: ok ? q.missed : [...q.missed, it] } });
+      return;
+    }
     const it = q.items[q.i], g = given.trim().toLowerCase();
     const ok = q.dir === 'k2r' ? (g === it.r || (this.state.kana.alts[it.r] || []).includes(g)) : given === it.ch;
     this.record(it.id, ok);
@@ -115,7 +138,7 @@ class App extends Component {
     if (i >= q.items.length) { this.setState({ q: { ...q, done: true } }); return; }
     this.setState({ q: { ...q, i, ans: null, typed: '', revealed: false, opts: this.optsFor(q.items[i], q.dir, q.mode) } },
       () => this.inp && this.inp.focus());
-    if (q.mode === 'respond' && SETTINGS.autoSpeak) this.speak(PH.plain(q.items[i].jp));
+    if ((q.mode === 'respond' || (q.mode === 'vocab' && q.vdir === 'j2e')) && SETTINGS.autoSpeak) this.speak(PH.plain(q.items[i].jp));
   };
   // drawing pad
   canvasRef = el => { if (el && el !== this.cv) { this.cv = el; el.width = 720; el.height = 720; this.strokes = []; } if (!el) this.cv = null; };
@@ -164,7 +187,7 @@ class App extends Component {
     // quiz setup
     const q = S.q;
     v.isQuizSetup = S.tab === 'quiz' && !q; v.isQuizActive = S.tab === 'quiz' && !!q && !q.done; v.isQuizDone = S.tab === 'quiz' && !!q && !!q.done;
-    const modes = [['mc', 'ア', 'Multiple choice', 'Pick the right answer from four options.'], ['type', 'ka', 'Type the reading', 'See a kana, type its romaji on the keyboard.'], ['write', '✎', 'Write it', 'See the romaji, draw the kana with your finger or Pencil, then check yourself.'], ['respond', '応', 'Staff asks → You respond', 'Hear what staff say at the shop, restaurant or hotel, then pick a natural reply.']];
+    const modes = [['mc', 'ア', 'Multiple choice', 'Pick the right answer from four options.'], ['type', 'ka', 'Type the reading', 'See a kana, type its romaji on the keyboard.'], ['write', '✎', 'Write it', 'See the romaji, draw the kana with your finger or Pencil, then check yourself.'], ['respond', '応', 'Staff asks → You respond', 'Hear what staff say at the shop, restaurant or hotel, then pick a natural reply.'], ['vocab', '語', 'Useful words', 'Practice the words from the Words tab: pick the meaning, pick the Japanese, or type it.']];
     v.modeCards = modes.map(([m, glyph, title, desc]) => { const on = S.mode === m; return { glyph, title, desc, go: () => set({ mode: m }), border: on ? '#d0647d' : '#eee1e3', bg: on ? '#fdf1f3' : '#fff', iconBg: on ? '#d0647d' : '#f2e6e8', iconColor: on ? '#fff' : '#86727a', dot: on ? '#d0647d' : 'transparent' }; });
     v.qScriptSeg = this.seg([['h', 'Hiragana'], ['k', 'Katakana'], ['both', 'Both']], S.qScript, x => set({ qScript: x }));
     v.setChips = [['basic', 'Basic'], ['dakuten', 'Dakuten'], ['combo', 'Combos']].map(([k, label]) => { const on = S.qSets[k]; return { label, go: () => set({ qSets: { ...S.qSets, [k]: !on } }), border: on ? '#d0647d' : '#eee1e3', bg: on ? '#fdf1f3' : '#fff', color: on ? '#b44d66' : '#86727a' }; });
@@ -174,8 +197,12 @@ class App extends Component {
     v.lenSeg = this.seg([[10, '10'], [20, '20'], ['all', 'All']], S.qLen, x => set({ qLen: x }));
     v.isRespondSetup = S.mode === 'respond';
     v.rCatChips = this.respondCats().map(c => { const on = !S.rCats[c]; return { label: c, go: () => set({ rCats: { ...S.rCats, [c]: on } }), border: on ? '#d0647d' : '#eee1e3', bg: on ? '#fdf1f3' : '#fff', color: on ? '#b44d66' : '#86727a' }; });
+    v.isVocabSetup = S.mode === 'vocab';
+    v.wCatChips = VOCAB.map(c => c.cat).map(c => { const on = !S.wCats[c]; return { label: c, go: () => set({ wCats: { ...S.wCats, [c]: on } }), border: on ? '#d0647d' : '#eee1e3', bg: on ? '#fdf1f3' : '#fff', color: on ? '#b44d66' : '#86727a' }; });
+    v.vdirSeg = this.seg([['j2e', 'Japanese → English'], ['e2j', 'English → Japanese'], ['type', 'Type romaji']], S.vdir, x => set({ vdir: x }));
     const pool = this.pool(), nWeak = pool.filter(it => this.isWeak(it.id)).length;
     v.poolNote = !pool.length ? 'Choose at least one character set.' : `${pool.length} characters${nWeak ? ` · ${nWeak} weak ones come up more often` : ''}`;
+    if (S.mode === 'vocab') { const wp = this.wordPool(), wk = wp.filter(it => this.isWeak(it.id)).length; v.poolNote = wp.length ? `${wp.length} words${wk ? ` · ${wk} weak ones come up more often` : ''}` : 'Choose at least one group.'; }
     if (S.mode === 'respond') { const rp = this.respondPool().length; v.poolNote = rp ? `${rp} things staff say` : 'Choose at least one situation.'; }
     // active quiz
     if (q && !q.done) {
@@ -210,10 +237,23 @@ class App extends Component {
         fbText: !a ? '' : a.ok ? 'Correct!' : 'Not quite — the green one fits.',
         otherReplies: a ? it.replies.filter(x => !q.opts.some(o => o.ok && o.jp === x.jp)) : [] });
     }
+    if (q && !q.done && q.mode === 'vocab') {
+      const it = q.items[q.i], a = q.ans, typing = q.vdir === 'type';
+      Object.assign(v, { isMC: false, isType: typing, isVocab: true, promptIsKana: false, wPrompt: it, wJp: q.vdir === 'j2e',
+        promptHint: q.vdir === 'j2e' ? `${it.cat} · what does it mean?` : typing ? `${it.cat} · type it in romaji` : `${it.cat} · which word is it?`,
+        wSpeak: () => this.speak(PH.plain(it.jp)),
+        wOpts: q.opts.map((o, i) => { const chosen = a && a.given === i;
+          return { ...o, go: () => this.answerReply(i), showMore: !!a,
+            bg: a && o.ok ? '#e3f2e7' : chosen ? '#fbe5e1' : '#fff', border: a && o.ok ? '#7fbf94' : chosen ? '#e3917f' : '#eee1e3',
+            opacity: a && !o.ok && !chosen ? 0.5 : 1 }; }),
+        showCheck: typing && !a,
+        fbText: !a ? '' : a.ok ? 'Correct!' : `${PH.plain(it.jp)} (${it.ro}) means “${it.en}”`,
+        wReveal: !!a });
+    }
     if (q && q.done) {
       const n = q.items.length, seen = new Set();
       Object.assign(v, { score: `${q.ok} / ${n}`, scorePct: `${Math.round(q.ok / n * 100)}% correct`, hasMissed: q.missed.length > 0,
-        missed: q.mode === 'respond' ? [] : q.missed.filter(m => !seen.has(m.id) && seen.add(m.id)).map(m => ({ ch: m.ch, r: m.r })),
+        missed: q.mode === 'respond' ? [] : q.missed.filter(m => !seen.has(m.id) && seen.add(m.id)).map(m => q.mode === 'vocab' ? { ch: PH.plain(m.jp), r: m.en } : { ch: m.ch, r: m.r }),
         missedPhrases: q.mode !== 'respond' ? [] : q.missed.filter(m => !seen.has(m.id) && seen.add(m.id)),
         retryMissed: () => this.begin(this.shuffle(q.missed), q.mode),
         again: () => this.begin(this.shuffle(q.items), q.mode), toSetup: () => set({ q: null }) });
@@ -243,7 +283,7 @@ class App extends Component {
     v.wordCount = VOCAB.reduce((n, c) => n + c.items.length, 0);
     // progress
     const tried = K.items.filter(it => this.tries(it.id)), mastered = tried.filter(it => this.tries(it.id) >= 3 && this.acc(it.id) >= 0.85);
-    const tot = Object.entries(S.stats).filter(([k]) => !k.startsWith('p:')).map(([, s]) => s).reduce((a, s) => [a[0] + s.c, a[1] + s.c + s.w], [0, 0]);
+    const tot = Object.entries(S.stats).filter(([k]) => !k.startsWith('p:') && !k.startsWith('w:')).map(([, s]) => s).reduce((a, s) => [a[0] + s.c, a[1] + s.c + s.w], [0, 0]);
     v.tiles = [{ label: 'Characters practiced', value: `${tried.length} / ${K.items.length}` }, { label: 'Mastered', value: mastered.length }, { label: 'Overall accuracy', value: tot[1] ? `${Math.round(tot[0] / tot[1] * 100)}%` : '—' }];
     const heatBg = c => { const a = this.acc(c.id); return a === null ? '#f4ecec' : a < 0.5 ? 'oklch(0.92 0.045 5)' : a < 0.8 ? 'oklch(0.8 0.09 5)' : 'oklch(0.65 0.13 5)'; };
     v.heat = [['h', 'Hiragana'], ['k', 'Katakana']].map(([s, title]) => { const hs = K.sections[s][0], rows = [];
@@ -343,7 +383,17 @@ class App extends Component {
             </button>`)}
         </div>
         <div style=${`${card};border-radius:24px;padding:8px 24px;display:flex;flex-direction:column`}>
-          ${v.isRespondSetup ? html`
+          ${v.isVocabSetup ? html`
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid #f3e9eb;flex-wrap:wrap">
+            <div style="font-size:16px;font-weight:500">Groups</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${v.wCatChips.map(o => html`<button onClick=${o.go} style=${`border:2px solid ${o.border};border-radius:12px;padding:0 14px;min-height:44px;font:inherit;font-size:15px;font-weight:700;background:${o.bg};color:${o.color};cursor:pointer`}>${o.label}</button>`)}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid #f3e9eb;flex-wrap:wrap">
+            <div style="font-size:16px;font-weight:500">Direction</div>
+            ${segGroup(v.vdirSeg, 14)}
+          </div>` : v.isRespondSetup ? html`
           <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid #f3e9eb;flex-wrap:wrap">
             <div style="font-size:16px;font-weight:500">Situations</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -391,7 +441,31 @@ class App extends Component {
         </div>
         <div class="quizcard" style=${`width:100%;max-width:760px;${card};border-radius:28px;padding:32px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:28px`}>
           <div style="font-size:14px;color:#a08d93">${v.promptHint}</div>
-          ${v.isRespond ? html`
+          ${v.isVocab ? html`
+            <div style="width:100%;display:flex;align-items:flex-start;gap:14px">
+              <div style="width:52px;flex-shrink:0"></div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center">
+                ${v.wJp || v.wReveal
+                  ? html`<div lang="ja" class="wprompt" style=${`${KANA_FONT};font-size:56px;line-height:1.6`}>${furi(v.wPrompt.segs, 16)}</div>
+                    ${(v.phraseRomaji || v.wReveal) && html`<div style="font-size:17px;color:#b44d66">${v.wPrompt.ro}</div>`}`
+                  : ''}
+                ${(!v.wJp || v.wReveal) && html`<div class=${v.wJp ? '' : 'wprompt-en'} style=${`font-size:${v.wJp ? 18 : 40}px;font-weight:${v.wJp ? 500 : 700};color:${v.wJp ? '#86727a' : '#3b2b30'};line-height:1.25;text-wrap:balance`}>${v.wPrompt.en}</div>`}
+              </div>
+              ${v.wJp || v.wReveal
+                ? html`<button onClick=${v.wSpeak} aria-label="Play" style="width:52px;height:52px;flex-shrink:0;border-radius:14px;border:none;background:#fbe8ec;color:#b44d66;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Play</button>`
+                : html`<div style="width:52px;flex-shrink:0"></div>`}
+            </div>
+            ${v.wOpts.length > 0 && html`
+            <div style="width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+              ${v.wOpts.map(o => html`<button class="vopt" onClick=${o.go} style=${`min-height:84px;border-radius:18px;border:2px solid ${o.border};background:${o.bg};color:#3b2b30;opacity:${o.opacity};padding:10px 12px;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:background .15s,border-color .15s`}>
+                ${v.wJp
+                  ? html`<span style="font-size:19px;font-weight:700;line-height:1.3">${o.en}</span>${o.showMore && html`<span lang="ja" style=${`${KANA_FONT};font-size:15px;color:#86727a`}>${PH.plain(o.jp)}</span>`}`
+                  : html`<span lang="ja" style=${`${KANA_FONT};font-size:26px;line-height:1.7`}>${furi(o.segs, 11)}</span>
+                    ${(v.phraseRomaji || o.showMore) && html`<span style="font-size:13px;color:#b44d66">${o.ro}</span>`}
+                    ${o.showMore && html`<span style="font-size:13px;color:#86727a">${o.en}</span>`}`}
+              </button>`)}
+            </div>`}`
+          : v.isRespond ? html`
             <div style="width:100%;display:flex;align-items:flex-start;gap:14px">
               <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center">
                 <div lang="ja" class="rprompt" style=${`${KANA_FONT};font-size:32px;line-height:1.9;text-wrap:pretty`}>${furi(v.rPrompt.segs, 14)}</div>
