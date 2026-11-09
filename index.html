@@ -76,7 +76,16 @@ a{color:#b44d66}a:hover{color:#8f3a50}
 <script type="module" src="app.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // On the very first visit the fonts load before the service worker is in control,
+    // so fetch them again once it is, which saves them for offline use.
+    const warm = () => performance.getEntriesByType('resource').map(e => e.name)
+      .filter(u => /^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(u))
+      .forEach(u => fetch(u, { mode: 'cors' }).catch(() => {}));
+    if (navigator.serviceWorker.controller) warm();
+    else navigator.serviceWorker.addEventListener('controllerchange', warm, { once: true });
+  });
 }
 </script>
 </body>

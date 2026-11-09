@@ -24,7 +24,9 @@ python3 -m http.server 8000
 
 1. Host it on GitHub Pages: repo **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `/ (root)` → Save**. It will be at https://jtina.github.io/kana-learning/.
 2. Open the Pages URL in Safari on the iPad, then **Share → Add to Home Screen**.
-3. Open it once while online. A service worker (`sw.js`) caches the app and fonts, so after that it works offline.
+3. Open it once while online. A service worker (`sw.js`) saves the app and the fonts on the device, so after that it works fully offline, and on weak signal it opens instantly from the saved copy.
+
+Updates: when you're online the app checks for a newer version in the background; it shows up the next time you open the app.
 
 Audio uses the iPad's built-in Japanese text-to-speech voice (Settings → Accessibility → Spoken Content → Voices → Japanese).
 
